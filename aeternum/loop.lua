@@ -76,13 +76,10 @@ function Loop:tablelength(T)
 end
 
 function Loop:runOnce()
-    --print(self.tasks:length(), self.queue:length(), 1)
     for _ = 1, self.tasks:length() do
         local popped = self.tasks:popleft()
-        print(popped)
         self.queue:pushright(popped)
     end
-    --print(self.tasks:length(), self.queue:length(), 2)
     while not self.timers:empty() do
         local task, time = unpack(self.timers:pop())
         if not task.cancelled and not task.complete then
@@ -98,7 +95,6 @@ function Loop:runOnce()
     self:poll()
 
 
-    --print(self.queue:is_empty(), inspect(self._read_calls))
     while not self.queue:is_empty() do
         local task = self.queue:popleft()
         if not task.cancelled and not task.complete then
@@ -106,24 +102,22 @@ function Loop:runOnce()
                 task._data = {}
             end
             local result = { task:resume(task._data) }
-            local response
-            if result then
-                response = table.remove(result, 1)
-                task._data = result
-            else
-                response = true
-                task._data = {}
-            end
+            local response = table.remove(result, 1)
             local command
             if not response then
-                task:setResult(result)
+                if #result == 1 and result[1] == "cannot resume dead coroutine" then
+                    task:setResult(task._data)
+                else
+                    task:setException(result[1])
+                end
             else
+                task._data = result
                 if #result ~= 0 then -- These are all our 'commands' that can be yielded directly into the loop
                     command = table.remove(task._data, 1) -- Always {'command', unpack(args)} after the initial response
                     if command == 'sleep' then
                         self.timers:insert({ task, self:time() + task._data[1] }) -- Add our time to our list of timers
                     else
-                        if command == "loop" then --# If we want the loop, give it to em
+                        if command == "loop" then -- If we want the loop, give it to em
                             task._data = self
                         else
                             if command == "current_task" then
@@ -131,7 +125,7 @@ function Loop:runOnce()
                             else
                                 local attr = self[command]
                                 if attr then
-                                    task._data = attr(unpack(task._data))
+                                    task._data = attr(self, unpack(task._data))
                                     if type(task._data) == "thread" and command ~= "create_task" then
                                         self:createTask(task._data)
                                     end
@@ -150,7 +144,6 @@ function Loop:runOnce()
             end
         end
     end
-    --print(self.timers:empty(), self.tasks:is_empty(), self.queue:is_empty(), table.empty(self.readers), table.empty(self.writers))
     return not self.timers:empty() or not self.tasks:is_empty() or not self.queue:is_empty() or not table.empty(self.readers) or not table.empty(self.writers)
 end
 
@@ -174,7 +167,7 @@ function Loop:poll()
             if self._read_calls[sock] == nil then
                 self._read_calls[sock] = true
                 local task = self:createTask(coroutine.create(val))
-                task:setCallback(self._readCallback, {self, sock})
+                task:setCallback(self._readCallback, { self, sock })
             end
         end
 
@@ -183,7 +176,7 @@ function Loop:poll()
             if self._write_calls[sock] == nil then
                 self._write_calls[sock] = true
                 local task = self:createTask(coroutine.create(val))
-                task:setCallback(self._writeCallback, {self, sock})
+                task:setCallback(self._writeCallback, { self, sock })
             end
         end
     end
@@ -204,6 +197,14 @@ end
 
 function Loop:createWriter(socket, callback)
     self.writers[socket] = callback
+end
+
+function Loop:removeReader(socket)
+    self.readers[socket] = nil
+end
+
+function Loop:removeWriter(socket)
+    self.writers[socket] = nil
 end
 
 

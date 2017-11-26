@@ -27,8 +27,10 @@ function Future:running()
 end
 
 function Future:wait()
+    print(self.complete, self._error)
     while not self.complete and self._error == nil do
-        coroutine.yield(self)
+        print("how much waiting")
+        coroutine.yield()
     end
     return self.result()
 end
