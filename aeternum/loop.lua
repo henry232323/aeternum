@@ -57,7 +57,8 @@ function Loop:runUntilComplete(coro)
     local task = Task:new(coro)
     self.queue:pushleft(task)
     local run = self.runOnce
-    repeat until not run(self)
+    repeat until not run(self) and task.complete or task._error
+    return task:result()
 end
 
 function Loop:runForever()
@@ -106,7 +107,7 @@ function Loop:runOnce()
             local command
             if not response then
                 if #result == 1 and result[1] == "cannot resume dead coroutine" then
-                    task:setResult(task._data)
+                    task:setResult(unpack(task._data))
                 else
                     task:setException(result[1])
                 end
@@ -128,17 +129,27 @@ function Loop:runOnce()
                                     task._data = attr(self, unpack(task._data))
                                     if type(task._data) == "thread" and command ~= "create_task" then
                                         self:createTask(task._data)
+                                    else
+                                        if type(task._data) == "function" and command ~= "create_task" then
+                                            self:createTask(coroutine.create(task._data))
+                                        end
                                     end
                                     self.tasks:pushright(task)
                                 end
+                                print("zizizizizizi")
                             end
                         end
                     end
                 end
                 if command ~= 'sleep' then
-                    if type(task._data) == "Future" or type(task._data) == "Task" then
+                    if task._data._coro_type == "Future" then
                         self.tasks:pushright(task._data)
+                    else
+                        if type(task._data) == "thread" then
+                            self:createTask(task._data)
+                        end
                     end
+                    print("requeuing")
                     self.tasks:pushright(task)
                 end
             end
