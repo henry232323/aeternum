@@ -1,4 +1,5 @@
 Future = {
+    _coro_type = "Future",
     _data = nil,
     _result = nil,
     _error = nil,
@@ -12,6 +13,7 @@ Future = {
 function Future:new(o)
     o = o or {}
     setmetatable(o, self)
+    self._coro_type = "Future"
     self.__index = self
     self._task = coroutine.create(self.wait)
 
@@ -27,11 +29,12 @@ function Future:running()
 end
 
 function Future:wait()
-    print(self.complete, self._error)
     while not self.complete and self._error == nil do
         print("how much waiting")
         coroutine.yield()
+        print(f)
     end
+    print("done waiting")
     return self.result()
 end
 
@@ -47,6 +50,8 @@ function Future:result()
 end
 
 function Future:setResult(data)
+    inspect = require("inspect")
+    print("setResult", inspect(data), self._error, self.complete)
     if self.complete or self._error ~= nil then
         error("Future already completed")
     end
@@ -91,6 +96,14 @@ function Future:resume(value)
     end
 
     return self._task:resume(value)
+end
+
+function Future:status()
+    if type(self._task) == "thread" then
+        return coroutine.status(self._task)
+    end
+
+    return self._task:status()
 end
 
 Task = Future:new()
