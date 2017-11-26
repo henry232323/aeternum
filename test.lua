@@ -1,28 +1,26 @@
-Loop = require("loop")
-Future = require("futures").Future
-socket = require("socket")
+local aetherum = require "aetherum"
+local socket = require "socket"
 
-loop = Loop:new()
+local loop = aetherum.Loop:new()
 
 
-loop:runUntilComplete(coroutine.create( function()
+loop:runUntilComplete(coroutine.create(function()
     print("fump")
-    local fut = Future:new()
+    local fut = aetherum.Future:new()
     local sock = socket.connect("irc.freenode.net", 6667)
     local a = sock:receive(52)
     print(a)
     local function reader()
-        print("arsed")
-        fut.set_result(sock:receive(64))
+        print("arfed")
+        fut:setResult(sock:receive(64))
     end
 
     print("bumpkin")
     loop:createReader(sock, reader)
-
-    local result = fut.wait()
+    print("doki doki loki boki")
+    local result = fut:wait()
     print(result)
     socket.close()
-
 end))
 
 loop:runUntilComplete(coroutine.create(function()
