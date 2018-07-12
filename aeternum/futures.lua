@@ -32,9 +32,8 @@ function Future:wait()
     while not self.complete and self._error == nil do
         print("how much waiting")
         coroutine.yield()
-        print(f)
     end
-    print("done waiting")
+    --print("done waiting")
     return self.result()
 end
 
@@ -50,8 +49,9 @@ function Future:result()
 end
 
 function Future:setResult(data)
-    inspect = require("inspect")
-    print("setResult", inspect(data), self._error, self.complete)
+    --inspect = require("inspect")
+    --print("setResult", inspect(data), self._error, self.complete)
+    print(self.complete, self._error, data)
     if self.complete or self._error ~= nil then
         error("Future already completed")
     end
@@ -60,6 +60,7 @@ function Future:setResult(data)
     if self._callback then
         self._callback(unpack(self._callback_args))
     end
+    print("result set", data, self)
 end
 
 function Future:setCallback(func, args)
@@ -95,7 +96,7 @@ function Future:resume(value)
         return coroutine.resume(self._task, unpack(value))
     end
 
-    return self._task:resume(value)
+    return self._task:resume(value) -- call down until we get to the coroutine
 end
 
 function Future:status()
