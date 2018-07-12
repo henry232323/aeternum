@@ -1,6 +1,6 @@
-Loop = require "loop"
-Deque = require "deque"
-futures = require "futures"
+Loop = require "aeternum/loop"
+Deque = require "aeternum/deque"
+futures = require "aeternum/futures"
 Future = futures.Future
 Task = futures.Task
 

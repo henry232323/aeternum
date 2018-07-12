@@ -1,7 +1,7 @@
-local Deque = require "deque"
-local futures = require "futures"
+local Deque = require "aeternum.deque"
+local futures = require "aeternum.futures"
 local heap = require "binary_heap" -- or "skew_heap"
-local socket = require "socket"
+local socket = require "socket" -- "aeternum\\core.dll"
 local inspect = require "inspect"
 
 local Task = futures.Task
@@ -54,16 +54,18 @@ function Loop:time()
 end
 
 function Loop:runUntilComplete(coro)
-    local task = Task:new(coro)
-    self.queue:pushleft(task)
+    self.task = Task:new(coro)
+    self.queue:pushleft(self.task)
     local run = self.runOnce
-    repeat until not run(self) and task.complete or task._error
-    return task:result()
+    repeat until not run(self) and (self.task.complete or self.task._error)
+    return self.task:result()
 end
 
 function Loop:runForever()
     local run = self.runOnce
-    while true do run(self) end
+    while true do
+        run(self)
+    end
 end
 
 function Loop:sleep(time)
@@ -72,7 +74,9 @@ end
 
 function Loop:tablelength(T)
     local count = 0
-    for _ in pairs(T) do count = count + 1 end
+    for _ in pairs(T) do
+        count = count + 1
+    end
     return count
 end
 
@@ -97,28 +101,34 @@ function Loop:runOnce()
 
 
     while not self.queue:is_empty() do
-        local task = self.queue:popleft()
-        if not task.cancelled and not task.complete then
+        local task = self.queue:popleft() -- get a new task
+        if not task.cancelled and not task.complete then -- check if done
             if task._data == nil then
-                task._data = {}
+                task._data = {} -- no idea what this is
             end
-            local result = { task:resume(task._data) }
-            local response = table.remove(result, 1)
+            local result = { task:resume(task._data) } -- result is the new task data, pack into table
+            local response = table.remove(result, 1) -- grab first item, true = success, false = error
             local command
-            if not response then
-                if #result == 1 and result[1] == "cannot resume dead coroutine" then
+            print("responding!", inspect(result))
+            if not response then -- if errored
+                if #result == 1 and result[1] == "cannot resume dead coroutine" then -- task is done
+                    print("setting loop result", inspect(result), inspect(response), inspect(task._data))
                     task:setResult(unpack(task._data))
-                else
+                    print("we made it!")
+                else -- we got an error
+                    print("errored!", result[1])
                     task:setException(result[1])
                 end
             else
-                task._data = result
-                if #result ~= 0 then -- These are all our 'commands' that can be yielded directly into the loop
+                task._data = result -- replace data with new data
+                if #result ~= 0 then
+                    -- These are all our 'commands' that can be yielded directly into the loop
                     command = table.remove(task._data, 1) -- Always {'command', unpack(args)} after the initial response
                     if command == 'sleep' then
                         self.timers:insert({ task, self:time() + task._data[1] }) -- Add our time to our list of timers
                     else
-                        if command == "loop" then -- If we want the loop, give it to em
+                        if command == "loop" then
+                            -- If we want the loop, give it to em
                             task._data = self
                         else
                             if command == "current_task" then
@@ -136,7 +146,7 @@ function Loop:runOnce()
                                     end
                                     self.tasks:pushright(task)
                                 end
-                                print("zizizizizizi")
+                                --print("zizizizizizi")
                             end
                         end
                     end
@@ -149,12 +159,13 @@ function Loop:runOnce()
                             self:createTask(task._data)
                         end
                     end
-                    print("requeuing")
+                    --print("requeuing")
                     self.tasks:pushright(task)
                 end
             end
         end
     end
+    --print(self.timers:empty(), self.tasks:is_empty(), self.queue:is_empty(), table.empty(self.readers), table.empty(self.writers))
     return not self.timers:empty() or not self.tasks:is_empty() or not self.queue:is_empty() or not table.empty(self.readers) or not table.empty(self.writers)
 end
 
@@ -163,7 +174,7 @@ function Loop:poll()
         if self.queue:is_empty() and self.tasks:is_empty() and not self.timers:empty() then
             local task, time = unpack(self.timers:pop())
             self:sleep(time)
-            self.tasks:pushright(task)
+            self.tasks:pushleft(task)
         end
     else
         local timeout = 0

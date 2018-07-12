@@ -1,37 +1,42 @@
-local aetherum = require "aetherum"
+local aeternum = require "./aeternum/init"
 local socket = require "socket"
 
-local loop = aetherum.Loop:new()
+local loop = aeternum.Loop:new()
 
 
 local f = loop:runUntilComplete(coroutine.create(function()
     print("fump")
-    local fut = aetherum.Future:new()
+    local fut = aeternum.Future:new()
+    print("new future", fut)
     local sock = socket.connect("localhost", 6667)--socket.connect("irc.freenode.net", 6667)
     if sock == nil then
         error("Failed to connect!")
     end
     local a = sock:receive(52)
-    print(a)
+    print("received", a)
     local function reader()
-        print("arfed")
+        print("reading")
         fut:setResult(sock:receive(64))
         loop:removeReader(sock)
+        print("removed reader")
     end
 
-    print("bumpkin")
+    print("creating reader")
     loop:createReader(sock, reader)
-    print("doki doki loki boki")
-    while not fut.complete and fut._error == nil do
-            print("how much waiting")
-            coroutine.yield()
-            print(f)
-    end
-    local result = future:result()
+    print("created success")
+
+
+
+    inspect = require("inspect")
+    print("getting final result")
     --local result = fut:wait()
-    print(532123, result, "else resultate")
+
+
+    local result = fut:result()
+    print("got result", inspect(result))
     sock:close()
-    return "clap clapa"
+    print("socket closed")
+    return result
 end))
 inspect = require "inspect"
 print(f, inspect(f))
